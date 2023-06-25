@@ -1,0 +1,1181 @@
+Option Explicit
+
+Dim InitialCellParental As Range
+Dim InitialCellPrepartum As Range
+Dim InitialCellPostPartum As Range
+
+Dim LeaveString As Range
+Dim LeaveStartDate As Range
+Dim IsoWeek As Range
+Dim BenefitTotal As Range
+Dim DeductionTotal As Range
+Dim GrossTotal As Range
+Dim DaliRange As Range
+Dim UnderPaymentTotal As Range
+Dim PaymentNumber As Range
+Dim LeaveEndDate As Range
+
+
+Dim LeaveType As String
+Dim PaymentCadence As String
+
+Dim AmazonStartDate As Date
+Dim AmazonEndDate As Date
+Dim NewAmazonStartDate As Date
+Dim NewAmazonEndDate As Date
+
+Dim StateStartDate As Date
+Dim StateEndDate As Date
+Dim NewStateStartDate As Date
+Dim NewStateEndDate As Date
+
+Dim IncreaseDate As Date
+
+Dim LSDStandardHours As Double
+Dim StateWeeklyBenefit As Double
+Dim LSDPayRate As Double
+Dim DaliPaid As Double
+Dim DaliPaidParental As Double
+Dim DaliPaidPrePartum As Double
+Dim DaliPaidPostPartum As Double
+
+
+
+Dim TotalBenefit  As Double
+Dim TotalDeduction  As Double
+Dim TotalDaliPaid As Double
+Dim TotalGross As Double
+Dim TotalUnderpay As Double
+
+
+Dim OldBenefit As Double
+Dim NewBenefit As Double
+Dim MinimumBenefit As Double
+
+Dim NewPayRate As Double
+Dim NewStandardHours As Double
+Dim MinimumBenefitAmount As Double
+
+
+Dim NumberWeeks As Integer
+Dim i As Integer
+Dim J As Integer
+Dim chk As Integer
+Dim phrase As String
+
+
+
+
+
+
+Sub ParentalLeave()
+
+Set InitialCellParental = InputSheet.Range("FirstRowParental")
+
+    AmazonStartDate = InputSheet.Range("AmazonParentalStartDate").Value
+    AmazonEndDate = InputSheet.Range("AmazonParentalEndDate").Value
+    StateStartDate = InputSheet.Range("StateParentalStartDate").Value
+    StateEndDate = InputSheet.Range("StateParentalEndDate").Value
+    StateWeeklyBenefit = InputSheet.Range("StateParentalWeeklyBenefit").Value
+    MinimumBenefitAmount = InputSheet.Range("MinimumBenefit").Value
+    DaliPaidParental = InputSheet.Range("DaliPaidParental").Value
+    
+' Increase Payment variables
+    PaymentCadence = InputSheet.Range("PaymentCadence").Value
+    LSDStandardHours = InputSheet.Range("LSDStandardHours").Value
+    LSDPayRate = InputSheet.Range("LSDPayRate").Value
+    IncreaseDate = InputSheet.Range("PayRateIncreaseDate").Value
+    NewPayRate = InputSheet.Range("IncreasePayRate").Value
+    NewStandardHours = InputSheet.Range("NewStandartHours").Value
+    
+
+'Definition Variables
+OldBenefit = 0
+NewBenefit = 0
+NumberWeeks = 0
+chk = 0
+
+TotalBenefit = 0
+TotalDeduction = 0
+TotalDaliPaid = 0
+TotalGross = 0
+TotalUnderpay = 0
+
+' Calculates the amount of loops required
+
+Select Case PaymentCadence
+
+Case "Monthly"
+
+        NumberWeeks = DateDiff("m", AmazonStartDate, AmazonEndDate)
+
+Case Else
+        NumberWeeks = DateDiff("w", AmazonStartDate, NextSundayDate(AmazonEndDate), vbSunday)
+ 
+End Select
+
+
+If NumberWeeks <= 0 Then NumberWeeks = 0
+
+' ---------------------------------------------------------
+
+
+For i = 0 To NumberWeeks
+
+' These are the cells to be calculed
+
+    Set LeaveString = InitialCellParental.Offset(i, 0)
+    
+
+' Leave type, this could be changed for the time being is stated
+    LeaveString.Value = "Parental"
+    
+    
+    
+    
+    
+    Set PaymentNumber = InitialCellParental.Offset(i, 1) ' Payment number
+    
+        
+
+    PaymentNumber.Value = "Payment " & i + 1
+    
+
+WritingTest ("/* " & PaymentNumber.Value & " */ ")
+    
+    
+    
+    Set LeaveStartDate = InitialCellParental.Offset(i, 2) ' Displaying the Start Date
+    
+    
+    LeaveStartDate.Value = AmazonStartDate
+    LeaveStartDate.NumberFormat = "mm/dd/yyyy"
+    
+    
+    
+    
+    Set LeaveEndDate = InitialCellParental.Offset(i, 3) ' Recalculation of the EndDate
+    
+
+
+
+Select Case PaymentCadence
+
+Case "Monthly"
+
+            
+            
+        If DateSerial(Year(AmazonStartDate), Month(AmazonStartDate) + 1, 1) >= AmazonEndDate Then
+        
+        NewAmazonEndDate = AmazonEndDate
+        
+        Else
+        NewAmazonEndDate = DateSerial(Year(AmazonStartDate), Month(AmazonStartDate) + 1, 1)
+        
+        End If
+             
+Case Else
+
+        If NextSundayDate(AmazonStartDate) >= AmazonEndDate Then
+        
+        NewAmazonEndDate = AmazonEndDate
+        
+        Else
+        NewAmazonEndDate = NextSundayDate(AmazonStartDate)
+        
+        End If
+
+End Select
+
+
+
+
+' ------- Display the end Date
+
+    If NewAmazonEndDate = AmazonEndDate Then
+    
+    LeaveEndDate.Value = NewAmazonEndDate
+    
+    Else
+    
+    LeaveEndDate.Value = NewAmazonEndDate - 1
+    
+    End If
+
+    
+    LeaveEndDate.NumberFormat = "mm/dd/yyyy"
+    
+    
+    
+    
+    Set IsoWeek = InitialCellParental.Offset(i, 4)       ' Iso Week Calculation
+    
+
+    Select Case PaymentCadence
+    
+    Case "Monthly"
+    
+            IsoWeek.Value = DatePart("m", AmazonStartDate)
+    
+    Case Else
+            IsoWeek.Value = DatePart("ww", AmazonStartDate, vbSunday, vbFirstFourDays)
+    
+    End Select
+    
+    IsoWeek.NumberFormat = "0"
+    
+    
+    
+    
+    Set BenefitTotal = InitialCellParental.Offset(i, 5) ' Benefit Calculation
+    
+'just in case the agent starts the leave prior to starting the shift
+
+WritingTest ("--------Benefit Calculation -----------")
+
+
+
+If IncreaseDate < AmazonStartDate Then LSDPayRate = NewPayRate ' recalculate the payrate
+
+
+'Not to use If i = 0 And Weekday(AmazonStartDate, vbSunday) < ScheduleArray(0) Then AmazonStartDate = IncreaseDate
+
+
+If IncreaseDate >= AmazonStartDate And IncreaseDate <= NewAmazonEndDate Then
+
+       WritingTest ("Benefit Calculation with Increase")
+        
+        If IncreaseDate - AmazonStartDate < 0 Then
+        
+        ' Remix of these dates
+        
+        OldBenefit = BenefitCalculation(PaymentCadence, LSDPayRate, LastSundayDate(AmazonStartDate - 1), IncreaseDate, LSDStandardHours)
+        
+        Else
+        
+        OldBenefit = BenefitCalculation(PaymentCadence, LSDPayRate, AmazonStartDate, IncreaseDate, LSDStandardHours)
+        End If
+
+        NewBenefit = BenefitCalculation(PaymentCadence, NewPayRate, IncreaseDate, NewAmazonEndDate, NewStandardHours)
+        
+        LSDPayRate = NewPayRate ' Change the pay Rate
+        LSDStandardHours = NewStandardHours ' Change the New Standard Hours
+        
+        BenefitTotal.Value = NewBenefit + OldBenefit
+        
+        
+        WritingTest ("Benefit Previous Rate: " & OldBenefit & " Benefit New Rate: " & NewBenefit & " Total: " & BenefitTotal.Value)
+
+ElseIf AmazonStartDate = LastSundayDate(AmazonEndDate) And PaymentCadence <> "Monthly" Then
+
+
+        BenefitTotal.Value = BenefitCalculation(PaymentCadence, LSDPayRate, AmazonStartDate, AmazonEndDate + 1, LSDStandardHours)
+
+Else
+
+        BenefitTotal.Value = BenefitCalculation(PaymentCadence, LSDPayRate, AmazonStartDate, NewAmazonEndDate, LSDStandardHours)
+
+
+End If
+
+        BenefitTotal.NumberFormat = "0.00"
+        WritingTest ("Amazon Start Date: " & AmazonStartDate & " Amazon End Date: " & NewAmazonEndDate)
+    
+    
+    Set DeductionTotal = InitialCellParental.Offset(i, 6)   ' Deduction Calculation
+
+ 
+ WritingTest ("--------------- Deduction Calculation ----------")
+ 
+ If StateStartDate > NewAmazonEndDate Or StateStartDate = 0 Or AmazonStartDate > StateEndDate Then
+ 
+      DeductionTotal.Value = 0
+      
+ ElseIf StateStartDate >= AmazonStartDate And StateStartDate <= NewAmazonEndDate Then
+ 
+ DeductionTotal.Value = DeductionCalculation(LeaveString.Value, StateStartDate, NewAmazonEndDate, StateWeeklyBenefit)
+
+ 
+ ElseIf NewAmazonEndDate >= StateEndDate And PaymentCadence <> "Monthly" Then
+ 
+ DeductionTotal.Value = DeductionCalculation(LeaveString.Value, AmazonStartDate, StateEndDate + 1, StateWeeklyBenefit)
+ 
+
+ Else
+ 
+ DeductionTotal.Value = DeductionCalculation(LeaveString.Value, AmazonStartDate, NewAmazonEndDate, StateWeeklyBenefit)
+ 
+ End If
+ 
+    
+    DeductionTotal.NumberFormat = "0.00"
+    
+    
+    
+    Set GrossTotal = InitialCellParental.Offset(i, 7) ' Gross Calculation
+    
+WritingTest ("--------- Gross calculation -----------")
+
+    GrossTotal.Value = GrossCalculation(BenefitTotal.Value, DeductionTotal.Value)
+    GrossTotal.NumberFormat = "0.00"
+    
+    If GrossTotal.Value < 25 And GrossTotal.Value > 0 Then GrossTotal.Value = 25
+    
+    If GrossTotal.Value = 0 Then GrossTotal.Value = 0
+
+
+' Handler minimum contribution
+    If GrossTotal.Value < 0 Then
+    
+    MinimumBenefit = MinimumBenefitCalculation(LeaveString.Value, AmazonStartDate, NewAmazonEndDate, MinimumBenefitAmount)
+    
+    GrossTotal.Value = MinimumBenefit
+    GrossTotal.NumberFormat = "0.00"
+    
+    
+    End If
+    
+TotalGross = TotalGross + GrossTotal.Value
+TotalDeduction = TotalDeduction + DeductionTotal.Value
+TotalBenefit = TotalBenefit + BenefitTotal.Value
+
+' Checking agents cadence to modify end date
+
+Select Case PaymentCadence
+
+Case "Monthly"
+
+            AmazonStartDate = DateSerial(Year(AmazonStartDate), Month(AmazonStartDate) + 1, 1)
+             
+Case Else
+            AmazonStartDate = NextSundayDate(AmazonStartDate)
+
+
+
+End Select
+
+
+WritingTest ("======== End of Line ==========")
+
+If AmazonStartDate > AmazonEndDate Then Exit For
+
+
+Next i
+
+
+'Totals
+
+
+    Set BenefitTotal = InitialCellParental.Offset(i + 2, 5)
+    Set DeductionTotal = InitialCellParental.Offset(i + 2, 6)
+    Set GrossTotal = InitialCellParental.Offset(i + 2, 7)
+    Set DaliRange = InitialCellParental.Offset(i + 2, 8)
+    Set UnderPaymentTotal = InitialCellParental.Offset(i + 2, 9)
+    
+    
+    
+    BenefitTotal.Value = TotalBenefit
+    DeductionTotal.Value = TotalDeduction
+    DaliRange.Value = DaliPaidParental
+    GrossTotal.Value = TotalGross
+    
+    UnderPaymentTotal.Value = GrossTotal.Value - DaliRange.Value
+    
+
+    UnderPaymentTotal.NumberFormat = "0.00"
+    BenefitTotal.NumberFormat = "0.00"
+    DeductionTotal.NumberFormat = "0.00"
+    DaliRange.NumberFormat = "0.00"
+    GrossTotal.NumberFormat = "0.00"
+
+
+
+
+End Sub
+
+
+
+
+
+Sub PrePartumLeave()
+
+Set InitialCellPrepartum = InputSheet.Range("FirstRowPrepartum")
+
+
+    AmazonStartDate = InputSheet.Range("AmazonPrePartumStartDate").Value
+    AmazonEndDate = InputSheet.Range("AmazonPrePartumEndDate").Value
+    StateStartDate = InputSheet.Range("StatePrePartumStartDate").Value
+    StateEndDate = InputSheet.Range("StatePrePartumEndDate").Value
+    StateWeeklyBenefit = InputSheet.Range("StatePrePartumWeeklyBenefit").Value
+    MinimumBenefitAmount = InputSheet.Range("MinimumBenefit").Value
+    
+PaymentCadence = InputSheet.Range("PaymentCadence").Value
+LSDStandardHours = InputSheet.Range("LSDStandardHours").Value
+LSDPayRate = InputSheet.Range("LSDPayRate").Value
+IncreaseDate = InputSheet.Range("PayRateIncreaseDate").Value
+NewPayRate = InputSheet.Range("IncreasePayRate").Value
+NewStandardHours = InputSheet.Range("NewStandartHours").Value
+
+DaliPaidPrePartum = InputSheet.Range("DaliPaidPrepartum").Value
+    
+OldBenefit = 0
+NewBenefit = 0
+NumberWeeks = 0
+chk = 0
+
+
+TotalBenefit = 0
+TotalDeduction = 0
+TotalDaliPaid = 0
+TotalGross = 0
+TotalUnderpay = 0
+
+' Calculates the amount of loops required
+
+Select Case PaymentCadence
+
+Case "Monthly"
+
+        NumberWeeks = DateDiff("m", AmazonStartDate, AmazonEndDate)
+
+Case Else
+        NumberWeeks = DateDiff("w", AmazonStartDate, NextSundayDate(AmazonEndDate), vbSunday)
+ 
+End Select
+
+
+If NumberWeeks <= 0 Then NumberWeeks = 0
+
+' ---------------------------------------------------------
+
+
+
+For i = 0 To NumberWeeks  ' Needs to be rewiewed, calculates numbers of Weeks
+
+
+    Set LeaveString = InitialCellPrepartum.Offset(i, 0) ' Leave type
+
+
+    LeaveString.Value = "Pre Partum"
+    
+    Set PaymentNumber = InitialCellPrepartum.Offset(i, 1)  ' Payment number
+    
+
+    PaymentNumber.Value = "Payment " & i + 1
+    
+    WritingTest ("/* " & PaymentNumber.Value & " */ ")
+      
+    
+    
+    Set LeaveStartDate = InitialCellPrepartum.Offset(i, 2)   ' Displaying the Start Date
+
+    LeaveStartDate.Value = AmazonStartDate
+    LeaveStartDate.NumberFormat = "mm/dd/yyyy"
+    
+    
+    
+    Set LeaveEndDate = InitialCellPrepartum.Offset(i, 3)
+   
+
+
+
+
+Select Case PaymentCadence
+
+Case "Monthly"
+
+            
+            
+        If DateSerial(Year(AmazonStartDate), Month(AmazonStartDate) + 1, 1) >= AmazonEndDate Then
+        
+        NewAmazonEndDate = AmazonEndDate
+        
+
+        
+        Else
+        NewAmazonEndDate = DateSerial(Year(AmazonStartDate), Month(AmazonStartDate) + 1, 1)
+        
+        
+        End If
+             
+Case Else
+
+        If NextSundayDate(AmazonStartDate) >= AmazonEndDate Then
+        
+        NewAmazonEndDate = AmazonEndDate
+        
+        Else
+        NewAmazonEndDate = NextSundayDate(AmazonStartDate)
+        
+        End If
+
+End Select
+
+
+
+
+' ------- Display the end Date
+
+    If NewAmazonEndDate = AmazonEndDate Then
+    
+    LeaveEndDate.Value = NewAmazonEndDate
+    
+    Else
+    
+    LeaveEndDate.Value = NewAmazonEndDate - 1
+    
+    End If
+
+    
+    LeaveEndDate.NumberFormat = "mm/dd/yyyy"
+    
+    
+    
+    Set IsoWeek = InitialCellPrepartum.Offset(i, 4)       ' Iso Week Calculation
+    
+
+    Select Case PaymentCadence
+    
+    Case "Monthly"
+    
+            IsoWeek.Value = DatePart("m", AmazonStartDate)
+    
+    Case Else
+            IsoWeek.Value = DatePart("ww", AmazonStartDate, vbSunday, vbFirstFourDays)
+    
+    End Select
+    
+    IsoWeek.NumberFormat = "0"
+
+    
+    Set BenefitTotal = InitialCellPrepartum.Offset(i, 5)  ' Benefit Calculation
+
+
+WritingTest ("--------Benefit Calculation -----------")
+
+
+
+If IncreaseDate < AmazonStartDate Then LSDPayRate = NewPayRate ' recalculate the payrate
+
+
+'Not to use If i = 0 And Weekday(AmazonStartDate, vbSunday) < ScheduleArray(0) Then AmazonStartDate = IncreaseDate
+
+
+If IncreaseDate >= AmazonStartDate And IncreaseDate <= NewAmazonEndDate Then
+
+       WritingTest ("Benefit Calculation with Increase")
+        
+        If IncreaseDate - AmazonStartDate < 0 Then
+        
+        ' Remix of these dates
+        
+        OldBenefit = BenefitCalculation(PaymentCadence, LSDPayRate, LastSundayDate(AmazonStartDate - 1), IncreaseDate, LSDStandardHours)
+        
+        Else
+        
+        OldBenefit = BenefitCalculation(PaymentCadence, LSDPayRate, AmazonStartDate, IncreaseDate, LSDStandardHours)
+        End If
+
+        NewBenefit = BenefitCalculation(PaymentCadence, NewPayRate, IncreaseDate, NewAmazonEndDate, NewStandardHours)
+        
+        LSDPayRate = NewPayRate ' Change the pay Rate
+        LSDStandardHours = NewStandardHours ' Change the New Standard Hours
+        
+        BenefitTotal.Value = NewBenefit + OldBenefit
+        
+        
+        WritingTest ("Benefit Previous Rate: " & OldBenefit & " Benefit New Rate: " & NewBenefit & " Total: " & BenefitTotal.Value)
+
+ElseIf AmazonStartDate = LastSundayDate(AmazonEndDate) And PaymentCadence <> "Monthly" Then
+
+
+        BenefitTotal.Value = BenefitCalculation(PaymentCadence, LSDPayRate, AmazonStartDate, AmazonEndDate + 1, LSDStandardHours)
+
+Else
+
+        BenefitTotal.Value = BenefitCalculation(PaymentCadence, LSDPayRate, AmazonStartDate, NewAmazonEndDate, LSDStandardHours)
+
+
+End If
+
+        BenefitTotal.NumberFormat = "0.00"
+        WritingTest ("Amazon Start Date: " & AmazonStartDate & " Amazon End Date: " & NewAmazonEndDate)
+    
+    
+
+    Set DeductionTotal = InitialCellPrepartum.Offset(i, 6)  ' Deduction Calculation
+
+ WritingTest ("--------------- Deduction Calculation ----------")
+ 
+ If StateStartDate > NewAmazonEndDate Or StateStartDate = 0 Or AmazonStartDate > StateEndDate Then
+ 
+      DeductionTotal.Value = 0
+      
+ ElseIf StateStartDate >= AmazonStartDate And StateStartDate <= NewAmazonEndDate Then
+ 
+ DeductionTotal.Value = DeductionCalculation(LeaveString.Value, StateStartDate, NewAmazonEndDate, StateWeeklyBenefit)
+
+ 
+ ElseIf NewAmazonEndDate >= StateEndDate Then
+ 
+ DeductionTotal.Value = DeductionCalculation(LeaveString.Value, AmazonStartDate, StateEndDate + 1, StateWeeklyBenefit)
+ 
+
+ Else
+ 
+ DeductionTotal.Value = DeductionCalculation(LeaveString.Value, AmazonStartDate, NewAmazonEndDate, StateWeeklyBenefit)
+ 
+ End If
+ 
+    
+    DeductionTotal.NumberFormat = "0.00"
+    
+    
+    Set GrossTotal = InitialCellPrepartum.Offset(i, 7)
+    
+WritingTest ("--------- Gross calculation -----------")
+
+     GrossTotal.Value = GrossCalculation(BenefitTotal.Value, DeductionTotal.Value)
+    GrossTotal.NumberFormat = "0.00"
+    
+    If GrossTotal.Value < 25 And GrossTotal.Value > 0 Then GrossTotal.Value = 25
+    
+    If GrossTotal.Value = 0 Then GrossTotal.Value = 0
+
+
+' Handler minimum contribution
+    If GrossTotal.Value < 0 Then
+    
+    MinimumBenefit = MinimumBenefitCalculation(LeaveString.Value, AmazonStartDate, NewAmazonEndDate, MinimumBenefitAmount)
+    
+    GrossTotal.Value = MinimumBenefit
+    GrossTotal.NumberFormat = "0.00"
+    
+    
+    End If
+    
+TotalGross = TotalGross + GrossTotal.Value
+TotalDeduction = TotalDeduction + DeductionTotal.Value
+TotalBenefit = TotalBenefit + BenefitTotal.Value
+
+
+    
+' Checking agents cadence to modify end date
+
+Select Case PaymentCadence
+
+Case "Monthly"
+
+            AmazonStartDate = DateSerial(Year(AmazonStartDate), Month(AmazonStartDate) + 1, 1)
+             
+Case Else
+            AmazonStartDate = NextSundayDate(AmazonStartDate)
+
+
+
+End Select
+
+
+WritingTest ("======== End of Line ==========")
+
+If AmazonStartDate > AmazonEndDate Then Exit For
+
+
+Next i
+
+
+'Totals
+
+
+    Set BenefitTotal = InitialCellPrepartum.Offset(i + 2, 5)
+    Set DeductionTotal = InitialCellPrepartum.Offset(i + 2, 6)
+    Set GrossTotal = InitialCellPrepartum.Offset(i + 2, 7)
+    Set DaliRange = InitialCellPrepartum.Offset(i + 2, 8)
+    Set UnderPaymentTotal = InitialCellPrepartum.Offset(i + 2, 9)
+    
+    
+    
+    BenefitTotal.Value = TotalBenefit
+    DeductionTotal.Value = TotalDeduction
+    DaliRange.Value = DaliPaidPrePartum
+    GrossTotal.Value = TotalGross
+    
+    UnderPaymentTotal.Value = GrossTotal.Value - DaliRange.Value
+    
+
+    UnderPaymentTotal.NumberFormat = "0.00"
+    BenefitTotal.NumberFormat = "0.00"
+    DeductionTotal.NumberFormat = "0.00"
+    DaliRange.NumberFormat = "0.00"
+    GrossTotal.NumberFormat = "0.00"
+
+
+End Sub
+
+Sub PostPartumLeave()
+
+Set InitialCellPostPartum = InputSheet.Range("FirstRowPostpartum")
+
+
+    AmazonStartDate = InputSheet.Range("AmazonPostPartumStartDate").Value
+    AmazonEndDate = InputSheet.Range("AmazonPostPartumEndDate").Value
+    StateStartDate = InputSheet.Range("StatePostPartumStartDate").Value
+    StateEndDate = InputSheet.Range("StatePostPartumEndDate").Value
+    StateWeeklyBenefit = InputSheet.Range("StatePostPartumWeeklyBenefit").Value
+    MinimumBenefitAmount = InputSheet.Range("MinimumBenefit").Value
+
+'General Variables
+
+PaymentCadence = InputSheet.Range("PaymentCadence").Value
+LSDStandardHours = InputSheet.Range("LSDStandardHours").Value
+LSDPayRate = InputSheet.Range("LSDPayRate").Value
+IncreaseDate = InputSheet.Range("PayRateIncreaseDate").Value
+NewPayRate = InputSheet.Range("IncreasePayRate").Value
+NewStandardHours = InputSheet.Range("NewStandartHours").Value
+
+
+OldBenefit = 0
+NewBenefit = 0
+NumberWeeks = 0
+chk = 0
+
+
+TotalBenefit = 0
+TotalDeduction = 0
+TotalDaliPaid = 0
+TotalGross = 0
+TotalUnderpay = 0
+
+DaliPaidPostPartum = InputSheet.Range("DaliPaidPostPartum").Value
+
+WritingTest ("Minimim Benefit set: " & MinimumBenefit)
+
+' Calculates the amount of loops required
+
+
+Select Case PaymentCadence
+
+Case "Monthly"
+
+        NumberWeeks = DateDiff("m", AmazonStartDate, AmazonEndDate)
+
+Case Else
+        NumberWeeks = DateDiff("w", AmazonStartDate, NextSundayDate(AmazonEndDate), vbSunday)
+ 
+End Select
+
+
+If NumberWeeks <= 0 Then NumberWeeks = 0
+
+
+
+If NumberWeeks <= 0 Then NumberWeeks = 0 Else NumberWeeks = NumberWeeks
+
+' ---------------------------------------------------------------------------
+
+
+For i = 0 To NumberWeeks  ' Needs to be rewiewed, calculates numbers of Weeks
+
+
+    Set LeaveString = InitialCellPostPartum.Offset(i, 0)  ' Leave type
+    
+
+    LeaveString.Value = "Post Partum"
+       
+    
+    
+    
+    Set PaymentNumber = InitialCellPostPartum.Offset(i, 1)     ' Payment number
+    
+    
+
+    PaymentNumber.Value = "Payment " & i + 1
+    
+    WritingTest ("/* " & PaymentNumber.Value & " */ ")
+   
+    
+
+    Set LeaveStartDate = InitialCellPostPartum.Offset(i, 2) ' Displaying the Start Date
+
+    
+    LeaveStartDate.Value = AmazonStartDate
+    LeaveStartDate.NumberFormat = "mm/dd/yyyy"
+    
+    
+    Set LeaveEndDate = InitialCellPostPartum.Offset(i, 3) ' Recalculation of the EndDate
+ 
+
+Select Case PaymentCadence
+
+Case "Monthly"
+
+            
+            
+        If DateSerial(Year(AmazonStartDate), Month(AmazonStartDate) + 1, 1) >= AmazonEndDate Then
+        
+        NewAmazonEndDate = AmazonEndDate
+        
+        Else
+        NewAmazonEndDate = DateSerial(Year(AmazonStartDate), Month(AmazonStartDate) + 1, 1)
+        
+        End If
+             
+Case Else
+
+        If NextSundayDate(AmazonStartDate) >= AmazonEndDate Then
+        
+        NewAmazonEndDate = AmazonEndDate
+        
+        Else
+        NewAmazonEndDate = NextSundayDate(AmazonStartDate)
+        
+        End If
+
+End Select
+
+
+
+
+' ------- Display the end Date
+
+    If NewAmazonEndDate = AmazonEndDate Then
+    
+    LeaveEndDate.Value = NewAmazonEndDate
+    
+    Else
+    
+    LeaveEndDate.Value = NewAmazonEndDate - 1
+    
+    End If
+
+    
+    LeaveEndDate.NumberFormat = "mm/dd/yyyy"
+    
+    
+    
+    Set IsoWeek = InitialCellPostPartum.Offset(i, 4)     ' Iso Week Calculation
+    
+
+  
+
+    Select Case PaymentCadence
+    
+    Case "Monthly"
+    
+            IsoWeek.Value = DatePart("m", AmazonStartDate)
+    
+    Case Else
+            IsoWeek.Value = DatePart("ww", AmazonStartDate, vbSunday, vbFirstFourDays)
+    
+    End Select
+    
+    IsoWeek.NumberFormat = "0"
+    
+    
+    
+    
+    Set BenefitTotal = InitialCellPostPartum.Offset(i, 5)   ' Benefit Calculation
+      
+WritingTest ("--------Benefit Calculation -----------")
+
+
+
+If IncreaseDate < AmazonStartDate Then LSDPayRate = NewPayRate ' recalculate the payrate
+
+
+'Not to use If i = 0 And Weekday(AmazonStartDate, vbSunday) < ScheduleArray(0) Then AmazonStartDate = IncreaseDate
+
+
+If IncreaseDate >= AmazonStartDate And IncreaseDate <= NewAmazonEndDate Then
+
+       WritingTest ("Benefit Calculation with Increase")
+        
+        If IncreaseDate - AmazonStartDate < 0 Then
+        
+        ' Remix of these dates
+        
+        OldBenefit = BenefitCalculation(PaymentCadence, LSDPayRate, LastSundayDate(AmazonStartDate - 1), IncreaseDate, LSDStandardHours)
+        
+        Else
+        
+        OldBenefit = BenefitCalculation(PaymentCadence, LSDPayRate, AmazonStartDate, IncreaseDate, LSDStandardHours)
+        End If
+
+        NewBenefit = BenefitCalculation(PaymentCadence, NewPayRate, IncreaseDate, NewAmazonEndDate, NewStandardHours)
+        
+        LSDPayRate = NewPayRate ' Change the pay Rate
+        LSDStandardHours = NewStandardHours ' Change the New Standard Hours
+        
+        BenefitTotal.Value = NewBenefit + OldBenefit
+        
+        
+        WritingTest ("Benefit Previous Rate: " & OldBenefit & " Benefit New Rate: " & NewBenefit & " Total: " & BenefitTotal.Value)
+
+ElseIf AmazonStartDate = LastSundayDate(AmazonEndDate) And PaymentCadence <> "Monthly" Then
+
+
+        BenefitTotal.Value = BenefitCalculation(PaymentCadence, LSDPayRate, AmazonStartDate, AmazonEndDate + 1, LSDStandardHours)
+
+Else
+
+        BenefitTotal.Value = BenefitCalculation(PaymentCadence, LSDPayRate, AmazonStartDate, NewAmazonEndDate, LSDStandardHours)
+
+
+End If
+
+        BenefitTotal.NumberFormat = "0.00"
+        WritingTest ("Amazon Start Date: " & AmazonStartDate & " Amazon End Date: " & NewAmazonEndDate)
+
+    
+    Set DeductionTotal = InitialCellPostPartum.Offset(i, 6)  ' Deduction Calculation
+ WritingTest (" --------------- Deduction Calculation ---------- ")
+ 
+ If StateStartDate > NewAmazonEndDate Or StateStartDate = 0 Or AmazonStartDate > StateEndDate Then
+ 
+      DeductionTotal.Value = 0
+      
+ ElseIf StateStartDate >= AmazonStartDate And StateStartDate <= NewAmazonEndDate Then
+ 
+ DeductionTotal.Value = DeductionCalculation(LeaveString.Value, StateStartDate, NewAmazonEndDate, StateWeeklyBenefit)
+
+ 
+ ElseIf NewAmazonEndDate >= StateEndDate Then
+ 
+ DeductionTotal.Value = DeductionCalculation(LeaveString.Value, AmazonStartDate, StateEndDate + 1, StateWeeklyBenefit)
+ 
+
+ Else
+ 
+ DeductionTotal.Value = DeductionCalculation(LeaveString.Value, AmazonStartDate, NewAmazonEndDate, StateWeeklyBenefit)
+ 
+ End If
+ 
+    
+    DeductionTotal.NumberFormat = "0.00"
+    
+    
+    
+    
+    Set GrossTotal = InitialCellPostPartum.Offset(i, 7) ' Gross Calculation
+    
+WritingTest ("--------- Gross calculation -----------")
+    
+  GrossTotal.Value = GrossCalculation(BenefitTotal.Value, DeductionTotal.Value)
+    GrossTotal.NumberFormat = "0.00"
+    
+    If GrossTotal.Value < 25 And GrossTotal.Value > 0 Then GrossTotal.Value = 25
+    
+    If GrossTotal.Value = 0 Then GrossTotal.Value = 0
+
+
+' Handler minimum contribution
+    If GrossTotal.Value < 0 Then
+    
+    MinimumBenefit = MinimumBenefitCalculation(LeaveString.Value, AmazonStartDate, NewAmazonEndDate, MinimumBenefitAmount)
+    
+    GrossTotal.Value = MinimumBenefit
+    GrossTotal.NumberFormat = "0.00"
+    
+    
+    End If
+    
+TotalGross = TotalGross + GrossTotal.Value
+TotalDeduction = TotalDeduction + DeductionTotal.Value
+TotalBenefit = TotalBenefit + BenefitTotal.Value
+  
+
+Select Case PaymentCadence
+
+Case "Monthly"
+
+            AmazonStartDate = DateSerial(Year(AmazonStartDate), Month(AmazonStartDate) + 1, 1)
+             
+Case Else
+            AmazonStartDate = NextSundayDate(AmazonStartDate)
+            
+End Select
+
+WritingTest ("======== End of Line ==========")
+WritingTest (" ")
+
+If AmazonStartDate > AmazonEndDate Then Exit For
+
+Next i
+
+
+    Set BenefitTotal = InitialCellPostPartum.Offset(i + 2, 5)
+    Set DeductionTotal = InitialCellPostPartum.Offset(i + 2, 6)
+    Set GrossTotal = InitialCellPostPartum.Offset(i + 2, 7)
+    Set DaliRange = InitialCellPostPartum.Offset(i + 2, 8)
+    Set UnderPaymentTotal = InitialCellPostPartum.Offset(i + 2, 9)
+    
+    
+    
+    BenefitTotal.Value = TotalBenefit
+    DeductionTotal.Value = TotalDeduction
+    DaliRange.Value = DaliPaidPostPartum
+    GrossTotal.Value = TotalGross
+    
+    UnderPaymentTotal.Value = GrossTotal.Value - DaliRange.Value
+    
+
+    UnderPaymentTotal.NumberFormat = "0.00"
+    BenefitTotal.NumberFormat = "0.00"
+    DeductionTotal.NumberFormat = "0.00"
+    DaliRange.NumberFormat = "0.00"
+    GrossTotal.NumberFormat = "0.00"
+
+
+
+
+End Sub
+
+Sub HolisticView()
+
+InputSheet.Range("A20: AI50").ClearContents
+
+Open Application.ActiveWorkbook.Path & "\Audit.txt" For Output As #1: Close #1
+
+
+If Not IsEmpty(InputSheet.Range("AmazonParentalStartDate")) Then
+
+WritingTest ("******")
+WritingTest ("Parental Leave Calculation")
+WritingTest ("******")
+
+
+ParentalLeave
+
+End If
+
+If Not IsEmpty(InputSheet.Range("AmazonPostPartumStartDate")) Then
+
+WritingTest ("******")
+WritingTest ("PostPartum Leave Calculation")
+WritingTest ("******")
+
+PostPartumLeave
+
+End If
+
+
+
+If Not IsEmpty(InputSheet.Range("AmazonPrePartumStartDate")) Then
+
+WritingTest ("******")
+WritingTest ("PrePartum Leave Calculation")
+WritingTest ("******")
+
+
+PrePartumLeave
+
+End If
+
+
+
+
+
+
+End Sub
+
+
+Sub ClearHolisticView()
+
+Dim AreaParental As String
+Dim AreaPrepartum As String
+Dim AreaPostPartum As String
+
+Dim LastCellParental As String
+Dim LastCellPrepartum As String
+Dim LastCellPostPartum As String
+
+
+Set InitialCellParental = InputSheet.Range("FirstRowParental")
+Set InitialCellPrepartum = InputSheet.Range("FirstRowPrepartum")
+Set InitialCellPostPartum = InputSheet.Range("FirstRowPostpartum")
+
+
+
+LastCellParental = InitialCellParental.End(xlDown).End(xlToRight).Address
+LastCellPrepartum = InitialCellPrepartum.End(xlDown).End(xlToRight).Address
+LastCellPostPartum = InitialCellPostPartum.End(xlDown).End(xlToRight).Address
+
+AreaPostPartum = InitialCellPostPartum.Address & ":" & LastCellPostPartum
+AreaPrepartum = InitialCellPrepartum.Address & ":" & LastCellPrepartum
+AreaParental = InitialCellParental.Address & ":" & LastCellParental
+
+' Clear Parental Leave
+Range(AreaParental).ClearContents
+
+' Clear PostPartum Leave
+Range(AreaPrepartum).ClearContents
+
+' Clear Prepartum Leave
+Range(AreaPostPartum).ClearContents
+
+' General information delete
+InputSheet.Range("PaymentCadence").ClearContents
+InputSheet.Range("LSDStandardHours").ClearContents
+InputSheet.Range("LSDPayRate").ClearContents
+InputSheet.Range("PayRateIncreaseDate").ClearContents
+InputSheet.Range("IncreasePayRate").ClearContents
+InputSheet.Range("NewStandartHours").ClearContents
+InputSheet.Range("Schedule").ClearContents
+
+
+' Delete Parental Data
+
+InputSheet.Range("AmazonParentalStartDate").ClearContents
+InputSheet.Range("AmazonParentalEndDate").ClearContents
+InputSheet.Range("StateParentalStartDate").ClearContents
+InputSheet.Range("StateParentalEndDate").ClearContents
+InputSheet.Range("StateParentalWeeklyBenefit").ClearContents
+InputSheet.Range("MinimumBenefit").ClearContents
+InputSheet.Range("DaliPaidParental").ClearContents
+
+
+' Delete Post Partum
+
+
+InputSheet.Range("AmazonPostPartumStartDate").ClearContents
+InputSheet.Range("AmazonPostPartumEndDate").ClearContents
+InputSheet.Range("StatePostPartumStartDate").ClearContents
+InputSheet.Range("StatePostPartumEndDate").ClearContents
+InputSheet.Range("StatePostPartumWeeklyBenefit").ClearContents
+InputSheet.Range("MinimumBenefit").ClearContents
+InputSheet.Range("DaliPaidPostpartum").ClearContents
+
+'Delete Pre Partum
+
+
+InputSheet.Range("AmazonPrePartumStartDate").ClearContents
+InputSheet.Range("AmazonPrePartumEndDate").ClearContents
+InputSheet.Range("StatePrePartumStartDate").ClearContents
+InputSheet.Range("StatePrePartumEndDate").ClearContents
+InputSheet.Range("StatePrePartumWeeklyBenefit").ClearContents
+InputSheet.Range("MinimumBenefit").ClearContents
+InputSheet.Range("DaliPaidPrepartum").ClearContents
+InputSheet.Range("LeaveType").ClearContents
+
+
+
+' Delete totals
+
+Dim ParentalFullBenefitCell As Range
+Dim PostPartumFullBenefitCell As Range
+Dim PrePartumFullBenefitCell As Range
+
+Set ParentalFullBenefitCell = InputSheet.Range("$F$19").End(xlDown)
+Set PostPartumFullBenefitCell = InputSheet.Range("$S$19").End(xlDown)
+Set PrePartumFullBenefitCell = InputSheet.Range("$AD$19").End(xlDown)
+
+On Error Resume Next
+
+Rows(ParentalFullBenefitCell.Row).EntireRow.ClearContents
+Rows(PostPartumFullBenefitCell.Row).EntireRow.ClearContents
+Rows(PrePartumFullBenefitCell.Row).EntireRow.ClearContents
+
+
+
+End Sub
+
